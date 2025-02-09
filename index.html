@@ -181,10 +181,20 @@
         canvas.height = window.innerHeight;
 
         let score = 0, level = 1, exp = 0, expNeeded = 100;
-        let experienceMultiplier = 1; // 跟踪经验倍数
-        let player = { x: canvas.width / 2, y: canvas.height - 80, width: 50, height: 50, speed: 8, color: "blue" };
+        let experienceMultiplier = 1;
+        let player = { x: canvas.width / 2, y: canvas.height - 80, width: 50, height: 50, speed: 8 };
         let enemies = [], bullets = [], bulletSpeed = 6, cooldown = 500, lastShotTime = 0;
-        let tripleShotChosen = false; // 跟踪三重射击是否已被选择
+        let tripleShotChosen = false;
+
+        // 创建一个临时canvas来绘制emoji作为主角
+        const playerTempCanvas = document.createElement('canvas');
+        const playerTempCtx = playerTempCanvas.getContext('2d');
+        playerTempCanvas.width = 50;
+        playerTempCanvas.height = 50;
+        playerTempCtx.font = '50px Arial';
+        playerTempCtx.fillText('🐦', 0, 40);
+        const playerBirdData = playerTempCtx.getImageData(0, 0, playerTempCanvas.width, playerTempCanvas.height);
+
 
         function spawnEnemy() {
             let size = 40, x = Math.random() * (canvas.width - size);
@@ -194,13 +204,13 @@
         function update() {
             enemies.forEach((enemy, i) => { enemy.y += enemy.speed; if (enemy.y > canvas.height) enemies.splice(i, 1); });
             bullets.forEach((bullet, bi) => {
-                bullet.y -= bullet.speed;
+                bullet.y -= bulletSpeed;
                 if (bullet.y < 0) bullets.splice(bi, 1);
                 enemies.forEach((enemy, ei) => {
                     if (bullet.x < enemy.x + enemy.width && bullet.x + bullet.width > enemy.x && bullet.y < enemy.y + enemy.height && bullet.y + bullet.height > enemy.y) {
                         enemies.splice(ei, 1); bullets.splice(bi, 1);
                         score++;
-                        let earnedExp = 10 * experienceMultiplier; // 根据倍数获得经验
+                        let earnedExp = 10 * experienceMultiplier;
                         exp += earnedExp;
                         document.getElementById("score").innerText = "得分: " + score;
                         document.getElementById("exp").innerText = `经验: ${exp}/${expNeeded}`;
@@ -213,10 +223,13 @@
 
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.fillStyle = player.color;
-            ctx.fillRect(player.x, player.y, player.width, player.height);
+            // 绘制主角emoji
+            ctx.putImageData(playerBirdData, player.x, player.y);
             enemies.forEach(enemy => { ctx.fillStyle = enemy.color; ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height); });
-            bullets.forEach(bullet => { ctx.fillStyle = "white"; ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height); });
+            bullets.forEach(bullet => {
+                ctx.fillStyle = 'white';
+                ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
+            });
         }
 
         function gameLoop() { update(); requestAnimationFrame(gameLoop); }
@@ -237,10 +250,9 @@
                 { name: "移动速度 +1", effect: () => player.speed++ },
                 { name: "子弹速度 +1", effect: () => bulletSpeed++ },
                 { name: "减少射击冷却", effect: () => cooldown = Math.max(200, cooldown - 100) },
-                { name: "双倍经验", effect: () => { experienceMultiplier *= 2; } } // 每次选择，经验倍数乘以 2
+                { name: "双倍经验", effect: () => { experienceMultiplier *= 2; } }
             ];
 
-            // 在第5级时新增三重射击选项
             if (level >= 5 &&!tripleShotChosen) {
                 upgrades.push({ name: "三重射击", effect: () => {
                     bulletSpeed += 2;
@@ -293,10 +305,10 @@
         function moveJoystick(touchX, touchY) {
             let dx = touchX - joystickCenterX;
             if (dx > 20) {
-                moveDir = 1;  // 向右
+                moveDir = 1;
                 joystick.style.left = "50px";
             } else if (dx < -20) {
-                moveDir = -1; // 向左
+                moveDir = -1;
                 joystick.style.left = "0px";
             } else {
                 moveDir = 0;
@@ -322,7 +334,6 @@
                 let bullet = { x: player.x + player.width / 2 - 5, y: player.y, width: 10, height: 20, speed: bulletSpeed };
                 bullets.push(bullet);
 
-                // 如果有三重射击，添加额外的子弹
                 if (tripleShotChosen) {
                     bullets.push({ x: bullet.x - 15, y: bullet.y, width: 10, height: 20, speed: bulletSpeed });
                     bullets.push({ x: bullet.x + 15, y: bullet.y, width: 10, height: 20, speed: bulletSpeed });
