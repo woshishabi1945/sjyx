@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="zh">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>射击游戏（带升级系统）</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: black;
+            text-align: center;
+        }
+
+        canvas {
+            display: block;
+            background: #222;
+        }
+
+        #score,
+        #exp,
+        #level {
+            position: fixed;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        #exp {
+            top: 40px;
+            font-size: 20px;
+        }
+
+        #level {
+            top: 70px;
+            font-size: 20px;
+        }
+
+        #joystick-container {
+            position: fixed;
+            bottom: 50px;
+            left: 50px;
+            width: 100px;
+            height: 100px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            touch-action: none;
+        }
+
+        #joystick {
+            width: 50px;
+            height: 50px;
+            background: white;
+            border-radius: 50%;
+            position: absolute;
+        }
+
+        #shootBtn {
+            position: fixed;
+            bottom: 50px;
+            right: 50px;
+            width: 80px;
+            height: 80px;
+            background: red;
+            border-radius: 50%;
+            color: white;
+            font-size: 20px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: none;
+            cursor: pointer;
+            touch-action: none;
+        }
+
+        #shootBtn:active {
+            background: darkred;
+        }
+
+        #upgradePanel {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.8);
+            padding: 20px;
+            color: white;
+            text-align: center;
+            border-radius: 10px;
+            display: none;
+        }
+
+        #upgradePanel button {
+            display: block;
+            width: 100%;
+            margin: 10px 0;
+            padding: 10px;
+            font-size: 18px;
+            background: white;
+            border: none;
+            cursor: pointer;
+        }
+
+        #upgradePanel button:hover {
+            background: lightgray;
+        }
+
+        /* 新增的更多按钮及菜单样式 */
+        #moreBtn {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            width: 50px;
+            height: 50px;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            font-size: 16px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        #moreMenu {
+            position: fixed;
+            top: 70px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            display: none;
+        }
+
+        #moreMenu button {
+            display: block;
+            width: 100%;
+            margin: 5px 0;
+            padding: 5px;
+            background: white;
+            border: none;
+            cursor: pointer;
+        }
+
+        #moreMenu button:hover {
+            background: lightgray;
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="gameCanvas"></canvas>
+    <div id="score">得分: 0</div>
+    <div id="exp">经验: 0/100</div>
+    <div id="level">等级: 1</div>
+    <div id="joystick-container"><div id="joystick"></div></div>
+    <button id="shootBtn">🔫</button>
+    <div id="upgradePanel">
+        <h2>选择你的升级</h2>
+        <button id="upgrade1"></button>
+        <button id="upgrade2"></button>
+        <button id="upgrade3"></button>
+    </div>
+    <!-- 新增的更多按钮及菜单 -->
+    <button id="moreBtn">更多</button>
+    <div id="moreMenu">
+        <button id="missMeBtn">你想我了吗</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        let score = 0, level = 1, exp = 0, expNeeded = 100;
+        let experienceMultiplier = 1; // 跟踪经验倍数
+        let player = { x: canvas.width / 2, y: canvas.height - 80, width: 50, height: 50, speed: 8, color: "blue" };
+        let enemies = [], bullets = [], bulletSpeed = 6, cooldown = 500, lastShotTime = 0;
+        let tripleShotChosen = false; // 跟踪三重射击是否已被选择
+
+        function spawnEnemy() {
+            let size = 40, x = Math.random() * (canvas.width - size);
+            enemies.push({ x, y: 0, width: size, height: size, speed: 3, color: "red" });
+        }
+
+        function update() {
+            enemies.forEach((enemy, i) => { enemy.y += enemy.speed; if (enemy.y > canvas.height) enemies.splice(i, 1); });
+            bullets.forEach((bullet, bi) => {
+                bullet.y -= bullet.speed;
+                if (bullet.y < 0) bullets.splice(bi, 1);
+                enemies.forEach((enemy, ei) => {
+                    if (bullet.x < enemy.x + enemy.width && bullet.x + bullet.width > enemy.x && bullet.y < enemy.y + enemy.height && bullet.y + bullet.height > enemy.y) {
+                        enemies.splice(ei, 1); bullets.splice(bi, 1);
+                        score++;
+                        let earnedExp = 10 * experienceMultiplier; // 根据倍数获得经验
+                        exp += earnedExp;
+                        document.getElementById("score").innerText = "得分: " + score;
+                        document.getElementById("exp").innerText = `经验: ${exp}/${expNeeded}`;
+                        checkLevelUp();
+                    }
+                });
+            });
+            draw();
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = player.color;
+            ctx.fillRect(player.x, player.y, player.width, player.height);
+            enemies.forEach(enemy => { ctx.fillStyle = enemy.color; ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height); });
+            bullets.forEach(bullet => { ctx.fillStyle = "white"; ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height); });
+        }
+
+        function gameLoop() { update(); requestAnimationFrame(gameLoop); }
+        setInterval(spawnEnemy, 1000);
+        gameLoop();
+
+        function checkLevelUp() {
+            if (exp >= expNeeded) {
+                exp -= expNeeded; level++; expNeeded += 50;
+                document.getElementById("level").innerText = `等级: ${level}`;
+                showUpgradeOptions();
+            }
+        }
+
+        function showUpgradeOptions() {
+            document.getElementById("upgradePanel").style.display = "block";
+            let upgrades = [
+                { name: "移动速度 +1", effect: () => player.speed++ },
+                { name: "子弹速度 +1", effect: () => bulletSpeed++ },
+                { name: "减少射击冷却", effect: () => cooldown = Math.max(200, cooldown - 100) },
+                { name: "双倍经验", effect: () => { experienceMultiplier *= 2; } } // 每次选择，经验倍数乘以 2
+            ];
+
+            // 在第5级时新增三重射击选项
+            if (level >= 5 &&!tripleShotChosen) {
+                upgrades.push({ name: "三重射击", effect: () => {
+                    bulletSpeed += 2;
+                    bulletSpeed = Math.max(bulletSpeed, 6);
+                    tripleShotChosen = true;
+                } });
+            }
+
+            let choices = [];
+            while (choices.length < 3) {
+                let rand = upgrades[Math.floor(Math.random() * upgrades.length)];
+                if (!choices.includes(rand)) choices.push(rand);
+            }
+
+            choices.forEach((choice, index) => {
+                let button = document.getElementById(`upgrade${index + 1}`);
+                button.innerText = choice.name;
+                button.onclick = () => {
+                    choice.effect();
+                    document.getElementById("upgradePanel").style.display = "none";
+                    document.getElementById("exp").innerText = `经验: ${exp}/${expNeeded}`;
+                };
+            });
+        }
+
+        // 触摸控制 - 摇杆
+        let joystick = document.getElementById("joystick");
+        let joystickContainer = document.getElementById("joystick-container");
+        let joystickCenterX = joystickContainer.offsetLeft + joystickContainer.offsetWidth / 2;
+        let moveDir = 0;
+
+        joystickContainer.addEventListener("touchstart", (event) => {
+            event.preventDefault();
+            let touch = event.touches[0];
+            moveJoystick(touch.clientX, touch.clientY);
+        });
+
+        joystickContainer.addEventListener("touchmove", (event) => {
+            event.preventDefault();
+            let touch = event.touches[0];
+            moveJoystick(touch.clientX, touch.clientY);
+        });
+
+        joystickContainer.addEventListener("touchend", () => {
+            joystick.style.left = "25px";
+            joystick.style.top = "25px";
+            moveDir = 0;
+        });
+
+        function moveJoystick(touchX, touchY) {
+            let dx = touchX - joystickCenterX;
+            if (dx > 20) {
+                moveDir = 1;  // 向右
+                joystick.style.left = "50px";
+            } else if (dx < -20) {
+                moveDir = -1; // 向左
+                joystick.style.left = "0px";
+            } else {
+                moveDir = 0;
+                joystick.style.left = "25px";
+            }
+        }
+
+        function movePlayer() {
+            if (moveDir === -1 && player.x > 0) {
+                player.x -= player.speed;
+            } else if (moveDir === 1 && player.x + player.width < canvas.width) {
+                player.x += player.speed;
+            }
+            requestAnimationFrame(movePlayer);
+        }
+        movePlayer();
+
+        // 触摸射击按钮
+        document.getElementById("shootBtn").addEventListener("touchstart", () => {
+            let now = Date.now();
+            if (now - lastShotTime > cooldown) {
+                lastShotTime = now;
+                let bullet = { x: player.x + player.width / 2 - 5, y: player.y, width: 10, height: 20, speed: bulletSpeed };
+                bullets.push(bullet);
+
+                // 如果有三重射击，添加额外的子弹
+                if (tripleShotChosen) {
+                    bullets.push({ x: bullet.x - 15, y: bullet.y, width: 10, height: 20, speed: bulletSpeed });
+                    bullets.push({ x: bullet.x + 15, y: bullet.y, width: 10, height: 20, speed: bulletSpeed });
+                }
+            }
+        });
+
+        // 新增的更多按钮及菜单逻辑
+        const moreBtn = document.getElementById('moreBtn');
+        const moreMenu = document.getElementById('moreMenu');
+        const missMeBtn = document.getElementById('missMeBtn');
+
+        moreBtn.addEventListener('click', () => {
+            moreMenu.style.display = moreMenu.style.display === 'none'? 'block' : 'none';
+        });
+
+        const audio = new Audio('你想我了吗.mp3');
+        missMeBtn.addEventListener('click', () => {
+            audio.play();
+        });
+    </script>
+</body>
+
+</html>
